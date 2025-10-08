@@ -1,0 +1,13 @@
+courses:
+  - id: 72970
+    name: TCS
+  - id: 73572
+    name: OS
+  - id: 74697
+    name: 汇编
+  - id: 74064
+    name: 计网
+  - id: 72572
+    name: 优化
+
+interval: 3600
