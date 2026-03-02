@@ -1,13 +1,17 @@
 courses:
-  - id: 72970
-    name: TCS
-  - id: 73572
-    name: OS
-  - id: 74697
-    name: 汇编
-  - id: 74064
-    name: 计网
-  - id: 72572
-    name: 优化
+    - id: 81508
+      name: 软工
+    - id: 81851
+      name: 习概
+    - id: 81891
+      name: 编译原理
+    - id: 82473
+      name: 创业基础
+    - id: 83538
+      name: 大数据存储与计算技术
+    - id: 83768
+      name: 数值分析
+    - id: 84379
+      name: 数据挖掘导论
 
 interval: 3600
