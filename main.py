@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import os
 import signal
+import ssl
 from datetime import datetime
 from pathlib import Path
 
@@ -119,7 +120,12 @@ async def main_async(args):
         # signal handling may not be available in some environments
         pass
 
-    async with aiohttp.ClientSession() as session:
+    # classroom.zju.edu.cn 使用了过短的 DH key，需降低 SSL 安全级别以允许连接
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+    connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+
+    async with aiohttp.ClientSession(connector=connector) as session:
         # 一次性运行
         for c in courses:
             await process_course(
