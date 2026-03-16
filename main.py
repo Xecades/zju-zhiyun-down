@@ -38,67 +38,71 @@ async def process_course(
 
     # 顺序处理每个回放
     for v in videos:
-        # if stop requested, abort processing this course immediately
-        if stop_event is not None and stop_event.is_set():
-            return
-
-        sub_id = str(v.get("sub_id"))
-        urls = v.get("urls", [])
-        if not urls:
-            continue
-
-        # 只取第一个可用 mp4
-        selected = None
-        for u in urls:
-            if u.endswith(".mp4"):
-                selected = u
-                break
-        if not selected:
-            selected = urls[0]
-
-        # 用 start_at 时间来命名，格式 YYYYMMDD_HHMMSS_subid.ext
-        start_at = str(v.get("start_at"))
-        ts = None
         try:
-            ts = int(start_at)
-        except Exception:
-            ts = None
-        if ts:
-            dt = datetime.fromtimestamp(ts)
-            timestr = dt.strftime("%Y%m%d_%H%M%S")
-        else:
-            timestr = "unknown"
+            # if stop requested, abort processing this course immediately
+            if stop_event is not None and stop_event.is_set():
+                return
 
-        ext = os.path.splitext(selected.split("?")[0])[1] or ".mp4"
-        filename = f"{timestr}_{sub_id}{ext}"
-        dest = out_dir / filename
-        # skip if final file already exists
-        if dest.exists():
-            logger.info(f"Skipping existing file: {course_name} | {dest.name}")
-            continue
+            sub_id = str(v.get("sub_id"))
+            urls = v.get("urls", [])
+            if not urls:
+                continue
 
-        if dry_run:
-            # human readable info: course name, start time, title
-            title = v.get("title") or "(no title)"
+            # 只取第一个可用 mp4
+            selected = None
+            for u in urls:
+                if u.endswith(".mp4"):
+                    selected = u
+                    break
+            if not selected:
+                selected = urls[0]
+
+            # 用 start_at 时间来命名，格式 YYYYMMDD_HHMMSS_subid.ext
             start_at = str(v.get("start_at"))
+            ts = None
             try:
-                start_ts = int(start_at)
-                start_str = datetime.fromtimestamp(start_ts).isoformat(sep=" ")
+                ts = int(start_at)
             except Exception:
-                start_str = str(start_at)
-            logger.info(
-                f"DRY-RUN: {course_name} | {start_str} | {title} -> {dest}\n  URL: {selected}"
-            )
-            continue
+                ts = None
+            if ts:
+                dt = datetime.fromtimestamp(ts)
+                timestr = dt.strftime("%Y%m%d_%H%M%S")
+            else:
+                timestr = "unknown"
 
-        # 简单重试（顺序）
-        for attempt in range(3):
-            try:
-                await download_file(session, selected, dest, stop_event=stop_event)
-                break
-            except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed for {selected}: {e}")
-                await asyncio.sleep(2**attempt)
+            ext = os.path.splitext(selected.split("?")[0])[1] or ".mp4"
+            filename = f"{timestr}_{sub_id}{ext}"
+            dest = out_dir / filename
+            # skip if final file already exists
+            if dest.exists():
+                logger.info(f"Skipping existing file: {course_name} | {dest.name}")
+                continue
+
+            if dry_run:
+                # human readable info: course name, start time, title
+                title = v.get("title") or "(no title)"
+                start_at = str(v.get("start_at"))
+                try:
+                    start_ts = int(start_at)
+                    start_str = datetime.fromtimestamp(start_ts).isoformat(sep=" ")
+                except Exception:
+                    start_str = str(start_at)
+                logger.info(
+                    f"DRY-RUN: {course_name} | {start_str} | {title} -> {dest}\n  URL: {selected}"
+                )
+                continue
+
+            # 简单重试（顺序）
+            for attempt in range(3):
+                try:
+                    await download_file(session, selected, dest, stop_event=stop_event)
+                    break
+                except Exception as e:
+                    logger.warning(f"Attempt {attempt + 1} failed for {selected}: {e}")
+                    await asyncio.sleep(2**attempt)
+        except Exception as e:
+            logger.warning(f"Skip one video in {course_name} due to error: {e}")
+            continue
 
 
 async def main_async(args):
@@ -128,13 +132,16 @@ async def main_async(args):
     async with aiohttp.ClientSession(connector=connector) as session:
         # 一次性运行
         for c in courses:
-            await process_course(
-                c,
-                out_root,
-                session,
-                dry_run=args.dry_run,
-                stop_event=stop_event,
-            )
+            try:
+                await process_course(
+                    c,
+                    out_root,
+                    session,
+                    dry_run=args.dry_run,
+                    stop_event=stop_event,
+                )
+            except Exception as e:
+                logger.warning(f"Skip one course due to error: {e}")
         if args.once:
             return
 
@@ -156,13 +163,16 @@ async def main_async(args):
                 logger.info("Stop requested, exiting main loop")
                 return
             for c in courses:
-                await process_course(
-                    c,
-                    out_root,
-                    session,
-                    dry_run=args.dry_run,
-                    stop_event=stop_event,
-                )
+                try:
+                    await process_course(
+                        c,
+                        out_root,
+                        session,
+                        dry_run=args.dry_run,
+                        stop_event=stop_event,
+                    )
+                except Exception as e:
+                    logger.warning(f"Skip one course due to error: {e}")
 
 
 def main():

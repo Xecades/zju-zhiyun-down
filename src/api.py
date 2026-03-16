@@ -1,7 +1,9 @@
+import asyncio
 import json
 from typing import Any, cast
 
 import aiohttp
+from loguru import logger
 
 
 async def fetch_course_catalogue(
@@ -9,15 +11,30 @@ async def fetch_course_catalogue(
     course_id: str,
 ) -> dict[str, Any] | None:
     url = f"https://classroom.zju.edu.cn/courseapi/v2/course/catalogue?course_id={course_id}"
-    timeout = aiohttp.ClientTimeout(total=30)
-    async with session.get(
-        url,
-        headers={"User-Agent": "zju-downloader/0.1"},
-        timeout=timeout,
-    ) as resp:
-        if resp.status != 200:
-            return None
-        return cast(dict[str, Any], await resp.json())
+    timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10)
+    last_error: Exception | None = None
+
+    for attempt in range(3):
+        try:
+            async with session.get(
+                url,
+                headers={"User-Agent": "zju-downloader/0.1"},
+                timeout=timeout,
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning(
+                        f"Fetch catalogue failed for course {course_id}, status={resp.status}"
+                    )
+                    return None
+                return cast(dict[str, Any], await resp.json())
+        except (TimeoutError, aiohttp.ClientError, OSError, ValueError) as exc:
+            last_error = exc
+            if attempt < 2:
+                await asyncio.sleep(2**attempt)
+                continue
+
+    logger.warning(f"Fetch catalogue failed for course {course_id}: {last_error}")
+    return None
 
 
 def extract_videos_from_course(
